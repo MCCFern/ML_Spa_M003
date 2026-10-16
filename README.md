@@ -159,8 +159,39 @@ antes):
 | Baseline estacional (t-7) | 2,46 | 3,16 | 0,11 |
 | **RandomForest (final)** | **1,92** | **2,52** | **0,43** |
 
-El MAE de test (1,92) es consistente con el estimado por validación cruzada (1,74):
-la metodología temporal fue honesta, sin sobreajuste severo.
+El MAE guardado de test es 1,92 y el estimado por CV es 1,74. Sus condiciones de interpretación se detallan a continuación.
+
+### Condiciones de evaluación y horizonte
+
+La tabla anterior conserva las métricas guardadas del proyecto; no se ha
+reentrenado ni reevaluado el modelo en esta revisión documental.
+
+- El baseline t-7 usa la observación real del mismo tramo siete días antes,
+  obtenida mediante un join por fecha y tramo. En `evaluation.ipynb` el histórico
+  combina train y test: para fechas avanzadas del test usa observaciones reales
+  anteriores que también pertenecen a test. Esto exige actualización del histórico;
+  no es un pronóstico de todo el bloque emitido desde el corte de train.
+- Esa referencia solo es operativamente calculable para un horizonte de hasta
+  siete días si el dato de t-7 ya está disponible en la fecha de emisión. El
+  retraso real de disponibilidad también cuenta. No se ha evaluado un horizonte
+  operativo único compartido entre modelos, ni una curva de error por horizonte.
+- El RandomForest permanece entrenado hasta el 24 de enero de 2026 y predice
+  con variables de calendario y tendencia, sin incorporar los valores reales
+  del target del test. Por ello, la tabla compara distintos conjuntos de
+  información; no demuestra una mejora bajo un único protocolo de emisión.
+- El código elimina filas sin t-7 al evaluar esa referencia. En los CSV
+  versionados se comprobó cobertura de 314/314 filas de test tras excluir cierres;
+  este recuento no es una nueva ejecución de las métricas del modelo.
+- El notebook y el estudio de viabilidad advierten posible infracontaje por
+  censura del export en las últimas ~2 semanas. Conservar esas filas condiciona
+  la interpretación de MAE 1,92 y 2,46. La magnitud del sesgo no se ha cuantificado;
+  conviene confirmar el corte, el significado temporal de las fechas y la
+  completitud del target, y repetir la evaluación con datos maduros.
+
+La proximidad entre MAE de CV y test no basta para demostrar ausencia de fuga,
+ausencia de sobreajuste o utilidad del modelo para dimensionar personal.
+
+
 
 **Interpretabilidad** (importancia de features del modelo final): la tendencia
 temporal pesa más (`dias_desde_inicio`, 0,35), seguida del tramo (`tramo_tarde`,
@@ -169,8 +200,7 @@ temporal pesa más (`dias_desde_inicio`, 0,35), seguida del tramo (`tramo_tarde`
 **Lectura de negocio:** un MAE de ~2 citas sobre una demanda media de ~5 citas/tramo
 permite dimensionar personal por franjas (flojo / normal / punta), pero no asignar
 cabina a cabina. El error se concentra en tarde y fin de semana, justo donde más
-demanda hay — el negocio debería tratar la predicción como un suelo, no como un
-techo, al dotar personal.
+demanda hay. La predicción puntual no es un límite inferior garantizado: antes de utilizarla para dotar personal deben evaluarse incertidumbre y costes de error.
 
 **Limitaciones y próximas mejoras** (ninguna es "probar otro modelo"):
 1. Incorporar *lags* (t-7, t-14) con protocolo de predicción rolling, si el negocio
@@ -266,8 +296,36 @@ cross-validation). Single evaluation against test (2026-01-25 → 2026-06-30):
 | Seasonal baseline (t-7) | 2.46 | 3.16 | 0.11 |
 | **RandomForest (final)** | **1.92** | **2.52** | **0.43** |
 
-Test MAE (1.92) is consistent with the cross-validated estimate (1.74) — the
-temporal validation methodology held up, without severe overfitting. Top features:
+Saved test MAE is 1.92 and cross-validated MAE is 1.74. Interpretation depends on the conditions below.
+
+### Evaluation conditions and forecast horizon
+
+The table preserves the project's saved metrics. No model was retrained or
+reevaluated as part of this documentation update.
+
+- The t-7 baseline joins the actual count from the same slot seven days earlier.
+  The evaluation history combines train and test, so later test dates can use
+  earlier actual observations from test. This requires an updated history;
+  it is not a forecast of the entire block issued at the training cutoff.
+- This baseline is operationally available only for horizons up to seven days,
+  provided the t-7 observation has already arrived at the forecast origin.
+  Data latency matters. A single shared operational horizon and error by horizon
+  have not been evaluated.
+- RandomForest remains trained through 24 January 2026 and uses calendar and
+  trend features, without incorporating actual test targets. The table therefore
+  compares different information sets, not a common forecast-origin protocol.
+- The code excludes rows without a t-7 observation for that baseline. The
+  versioned CSV files have t-7 coverage for 314/314 eligible test rows; this is
+  a coverage check, not a new model evaluation.
+- The evaluation notebook and business case flag possible export censoring in
+  the final ~2 weeks. Those rows affect interpretation of MAE 1.92 and 2.46.
+  The bias has not been quantified. Confirm the cutoff, date semantics and
+  target completeness before reevaluating on mature observations.
+
+Similar CV and test MAE do not by themselves establish absence of leakage,
+absence of overfitting, or suitability for staffing decisions.
+
+Top features:
 time trend, afternoon slot, day of week. An MAE of ~2 appointments against a mean
 demand of ~5 is enough to size staffing by band (low/normal/peak), but not for
 per-room assignment. See the Spanish section for the full limitations and
